@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import scrolledtext
+from fuzzywuzzy import fuzz
 
 import spacy
 
@@ -8,7 +9,7 @@ nlp = spacy.load("en_core_web_sm")
 
 # Define responses based on user input
 responses = {
-    # "hello": "Hi there! How can I help you today?",
+    "hello": "Hi there! How can I help you today?",
     "how can i pay my bill?": "You can pay your bill online through our website or mobile app.",
     "i'm experiencing internet issues.": "Have you tried restarting your router? That often resolves connectivity issues.",
     "yes , i have already done that": "in that case: please check the physical connections to ensure everything is properly connected.",
@@ -30,10 +31,22 @@ responses = {
 
 # Initialize user's name
 user_name = ""
+initial_interaction = True
+def get_matching_response(user_input):
+    # Calculate similarity scores between user input and predefined responses
+    similarity_scores = {key: fuzz.ratio(user_input.lower(), key) for key in responses}
+
+    # Get the response with the highest similarity
+    max_key = max(similarity_scores, key=similarity_scores.get)
+    max_score = similarity_scores[max_key]
+
+    # Return the response if similarity is above a threshold
+    threshold = 60  # You can adjust this threshold as needed
+    return responses[max_key] if max_score >= threshold else None
 
 def process_input(user_input):
-    global user_name
-    
+    global user_name , initial_interaction
+
     # Convert user input to lowercase
     user_input_lower = user_input.lower()
 
@@ -49,16 +62,26 @@ def process_input(user_input):
         response = responses.get("user_name_response", "Nice to meet you! How can I assist you today?")
         response = response.replace("{user_name}", user_name)
     else:
-        # Use the user's name in responses
-        response = responses.get(user_input_lower, "I'm sorry, I don't understand that.")
-        response = response.replace("{user_name}", user_name)
+        # Use fuzzy matching to get a related response
+        related_response = get_matching_response(user_input)
+        if related_response:
+            response = related_response.replace("{user_name}", user_name)
+        else:
+            response = "I'm sorry, I don't understand that."
 
-    # Get and display the response
+
+# Get and display the response
     chat_log.config(state=tk.NORMAL)
-    chat_log.insert(tk.END, f"User: {user_input}\n")
-    chat_log.insert(tk.END, f"Chatbot: {response}\n\n")
-    chat_log.config(state=tk.DISABLED)
-    chat_entry.delete(0, tk.END)
+    if initial_interaction == False:
+        chat_log.insert(tk.END, f"User: {user_input}\n")
+        chat_log.insert(tk.END, f"Chatbot: {response}\n\n")
+        chat_log.config(state=tk.DISABLED)
+        chat_entry.delete(0, tk.END)
+    else:
+        chat_log.insert(tk.END, f"Chatbot: {response}\n\n")
+        chat_log.config(state=tk.DISABLED)
+        chat_entry.delete(0, tk.END)
+        initial_interaction = False
 
 def send_message():
     user_input = chat_entry.get()
